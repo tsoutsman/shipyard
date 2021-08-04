@@ -510,3 +510,32 @@ fn debug() {
         })
         .unwrap();
 }
+
+#[test]
+fn lending_iter() {
+    use shipyard::iter::LendingIterator;
+
+    #[derive(Debug)]
+    struct USIZE(usize);
+    impl Component for USIZE {
+        type Tracking = track::Untracked;
+    }
+
+    #[derive(Debug)]
+    struct U32(u32);
+    impl Component for U32 {
+        type Tracking = track::Modification;
+    }
+
+    let mut world = World::new();
+
+    world.add_entity((USIZE(0), U32(0)));
+    world.add_entity((U32(1),));
+    world.add_entity((USIZE(2),));
+
+    let mut lending_iter = world.lending_iter::<(View<USIZE>, ViewMut<U32>)>();
+
+    while let Some((i, j)) = lending_iter.next() {
+        dbg!((i, j));
+    }
+}

@@ -1,8 +1,9 @@
 use crate::all_storages::{AllStorages, CustomStorageAccess, DeleteAny, Retain};
 use crate::atomic_refcell::{AtomicRefCell, Ref, RefMut};
-use crate::borrow::{Borrow, IntoBorrow};
+use crate::borrow::Borrow;
 use crate::entity_id::EntityId;
 use crate::info::WorkloadsTypeUsage;
+use crate::iter::{GetData, LendingIter};
 use crate::memory_usage::WorldMemoryUsage;
 use crate::public_transport::ShipyardRwLock;
 use crate::reserve::BulkEntityIter;
@@ -367,11 +368,8 @@ let (entities, mut usizes) = world
     #[cfg_attr(feature = "thread_local", doc = "[NonSend]: crate::NonSend")]
     #[cfg_attr(feature = "thread_local", doc = "[NonSync]: crate::NonSync")]
     #[cfg_attr(feature = "thread_local", doc = "[NonSendSync]: crate::NonSendSync")]
-    pub fn borrow<'s, V: IntoBorrow>(&'s self) -> Result<V, error::GetStorage>
-    where
-        V::Borrow: Borrow<'s, View = V>,
-    {
-        V::Borrow::borrow(self)
+    pub fn borrow<V: Borrow>(&self) -> Result<V::View<'_>, error::GetStorage> {
+        V::borrow(self)
     }
     #[doc = "Borrows the requested storages and runs the function.  
 Data can be passed to the function, this always has to be a single type but you can use a tuple if needed.
@@ -1057,6 +1055,16 @@ impl World {
         }
 
         WorkloadsTypeUsage(workload_type_info)
+    }
+    #[allow(missing_docs)]
+    pub fn lending_iter<'a, T: Borrow>(&'a self) -> LendingIter<T::View<'_>>
+    where
+        T::View<'a>: GetData,
+    {
+        LendingIter {
+            index: 0,
+            view: self.borrow::<T>().unwrap(),
+        }
     }
 }
 

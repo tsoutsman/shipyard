@@ -34,7 +34,7 @@ fn unique_storage() {
         assert_eq!(
             get_error,
             shipyard::error::GetStorage::MissingStorage {
-                name: Some(type_name::<Unique<USIZE>>().into()),
+                name: Some(type_name::<Unique<USIZE>>()),
                 id: StorageId::of::<Unique<USIZE>>(),
             }
         );
@@ -53,7 +53,7 @@ fn not_unique_storage() {
         Some(error::Run::GetStorage(get_storage)) => assert_eq!(
             get_storage,
             shipyard::error::GetStorage::MissingStorage {
-                name: Some(type_name::<Unique<USIZE>>().into()),
+                name: Some(type_name::<Unique<USIZE>>()),
                 id: StorageId::of::<Unique<USIZE>>(),
             }
         ),
@@ -64,7 +64,7 @@ fn not_unique_storage() {
         Some(error::Run::GetStorage(get_storage)) => assert_eq!(
             get_storage,
             shipyard::error::GetStorage::MissingStorage {
-                name: Some(type_name::<Unique<USIZE>>().into()),
+                name: Some(type_name::<Unique<USIZE>>()),
                 id: StorageId::of::<Unique<USIZE>>(),
             }
         ),

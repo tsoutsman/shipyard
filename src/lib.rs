@@ -26,6 +26,7 @@
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![warn(missing_docs)]
+#![feature(generic_associated_types)]
 
 extern crate alloc;
 
@@ -78,7 +79,7 @@ pub use all_storages::{AllStorages, CustomStorageAccess};
 pub use atomic_refcell::{ExclusiveBorrow, SharedBorrow};
 pub use atomic_refcell::{Ref, RefMut};
 #[doc(inline)]
-pub use borrow::{AllStoragesBorrow, Borrow, BorrowInfo, IntoBorrow, Mutability};
+pub use borrow::{AllStoragesBorrow, Borrow, BorrowInfo, Mutability};
 pub use component::Component;
 pub use contains::Contains;
 pub use delete::Delete;

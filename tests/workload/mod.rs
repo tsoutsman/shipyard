@@ -91,7 +91,7 @@ fn are_all_uniques_present_in_world() {
         Workload::builder("")
             .with_system(|_: UniqueView<USIZE>| {})
             .are_all_uniques_present_in_world(&world),
-        Err(error::UniquePresence::Unique(type_info).into())
+        Err(error::UniquePresence::Unique(type_info))
     );
 
     let type_info = {
@@ -103,7 +103,7 @@ fn are_all_uniques_present_in_world() {
         Workload::builder("")
             .with_system(|_: UniqueViewMut<USIZE>| {})
             .are_all_uniques_present_in_world(&world),
-        Err(error::UniquePresence::Unique(type_info).into())
+        Err(error::UniquePresence::Unique(type_info))
     );
 }
 

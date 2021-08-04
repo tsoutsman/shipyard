@@ -37,33 +37,20 @@ pub enum Mutability {
     Exclusive,
 }
 
-/// Transforms a view into a helper type. This allows workloads to have the current syntax.
-pub trait IntoBorrow {
-    /// Helper type almost allowing GAT on stable.
-    type Borrow: for<'a> Borrow<'a>;
-}
-
 /// Allows a type to be borrowed by [`World::borrow`], [`World::run`] and worklaods.
-pub trait Borrow<'a> {
+pub trait Borrow {
     #[allow(missing_docs)]
-    type View;
+    type View<'a>;
 
     /// This function is where the actual borrowing happens.
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage>;
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage>;
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct AllStoragesMutBorrower;
-
-impl IntoBorrow for AllStoragesViewMut<'_> {
-    type Borrow = AllStoragesMutBorrower;
-}
-
-impl<'a> Borrow<'a> for AllStoragesMutBorrower {
-    type View = AllStoragesViewMut<'a>;
+impl Borrow for AllStoragesViewMut<'_> {
+    type View<'a> = AllStoragesViewMut<'a>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         world
             .all_storages
             .borrow_mut()
@@ -72,18 +59,11 @@ impl<'a> Borrow<'a> for AllStoragesMutBorrower {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct UnitBorrower;
-
-impl IntoBorrow for () {
-    type Borrow = UnitBorrower;
-}
-
-impl<'a> Borrow<'a> for UnitBorrower {
-    type View = ();
+impl Borrow for () {
+    type View<'a> = ();
 
     #[inline]
-    fn borrow(_: &'a World) -> Result<Self::View, error::GetStorage>
+    fn borrow(_: &World) -> Result<Self::View<'_>, error::GetStorage>
     where
         Self: Sized,
     {
@@ -91,18 +71,11 @@ impl<'a> Borrow<'a> for UnitBorrower {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct EntitiesBorrower;
-
-impl IntoBorrow for EntitiesView<'_> {
-    type Borrow = EntitiesBorrower;
-}
-
-impl<'a> Borrow<'a> for EntitiesBorrower {
-    type View = EntitiesView<'a>;
+impl Borrow for EntitiesView<'_> {
+    type View<'a> = EntitiesView<'a>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -124,18 +97,11 @@ impl<'a> Borrow<'a> for EntitiesBorrower {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct EntitiesMutBorrower;
-
-impl IntoBorrow for EntitiesViewMut<'_> {
-    type Borrow = EntitiesMutBorrower;
-}
-
-impl<'a> Borrow<'a> for EntitiesMutBorrower {
-    type View = EntitiesViewMut<'a>;
+impl Borrow for EntitiesViewMut<'_> {
+    type View<'a> = EntitiesViewMut<'a>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -157,24 +123,14 @@ impl<'a> Borrow<'a> for EntitiesMutBorrower {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct ViewBorrower<T>(T);
-
-impl<T: Send + Sync + Component> IntoBorrow for View<'_, T>
+impl<T: Send + Sync + Component> Borrow for View<'_, T>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Send + Sync,
 {
-    type Borrow = ViewBorrower<T>;
-}
-
-impl<'a, T: Send + Sync + Component> Borrow<'a> for ViewBorrower<T>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Send + Sync,
-{
-    type View = View<'a, T>;
+    type View<'a> = View<'a, T>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -197,22 +153,14 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Sync + Component> IntoBorrow for NonSend<View<'_, T>>
+impl<T: Sync + Component> Borrow for NonSend<View<'_, T>>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Sync,
 {
-    type Borrow = NonSend<ViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Sync + Component> Borrow<'a> for NonSend<ViewBorrower<T>>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Sync,
-{
-    type View = NonSend<View<'a, T>>;
+    type View<'a> = NonSend<View<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -235,22 +183,14 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Send + Component> IntoBorrow for NonSync<View<'_, T>>
+impl<T: Send + Component> Borrow for NonSync<View<'_, T>>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Send,
 {
-    type Borrow = NonSync<ViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Send + Component> Borrow<'a> for NonSync<ViewBorrower<T>>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Send,
-{
-    type View = NonSync<View<'a, T>>;
+    type View<'a> = NonSync<View<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -273,16 +213,11 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Component> IntoBorrow for NonSendSync<View<'_, T>> {
-    type Borrow = NonSendSync<ViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Component> Borrow<'a> for NonSendSync<ViewBorrower<T>> {
-    type View = NonSendSync<View<'a, T>>;
+impl<T: Component> Borrow for NonSendSync<View<'_, T>> {
+    type View<'a> = NonSendSync<View<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -304,24 +239,14 @@ impl<'a, T: Component> Borrow<'a> for NonSendSync<ViewBorrower<T>> {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct ViewMutBorrower<T>(T);
-
-impl<T: Send + Sync + Component> IntoBorrow for ViewMut<'_, T>
+impl<T: Send + Sync + Component> Borrow for ViewMut<'_, T>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Send + Sync,
 {
-    type Borrow = ViewMutBorrower<T>;
-}
-
-impl<'a, T: Send + Sync + Component> Borrow<'a> for ViewMutBorrower<T>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Send + Sync,
-{
-    type View = ViewMut<'a, T>;
+    type View<'a> = ViewMut<'a, T>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -344,22 +269,14 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Sync + Component> IntoBorrow for NonSend<ViewMut<'_, T>>
+impl<T: Sync + Component> Borrow for NonSend<ViewMut<'_, T>>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Sync,
 {
-    type Borrow = NonSend<ViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Sync + Component> Borrow<'a> for NonSend<ViewMutBorrower<T>>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Sync,
-{
-    type View = NonSend<ViewMut<'a, T>>;
+    type View<'a> = NonSend<ViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -382,22 +299,14 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Send + Component> IntoBorrow for NonSync<ViewMut<'_, T>>
+impl<T: Send + Component> Borrow for NonSync<ViewMut<'_, T>>
 where
     <T::Tracking as track::Tracking<T>>::DeletionData: Send,
 {
-    type Borrow = NonSync<ViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Send + Component> Borrow<'a> for NonSync<ViewMutBorrower<T>>
-where
-    <T::Tracking as track::Tracking<T>>::DeletionData: Send,
-{
-    type View = NonSync<ViewMut<'a, T>>;
+    type View<'a> = NonSync<ViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -420,16 +329,11 @@ where
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Component> IntoBorrow for NonSendSync<ViewMut<'_, T>> {
-    type Borrow = NonSendSync<ViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Component> Borrow<'a> for NonSendSync<ViewMutBorrower<T>> {
-    type View = NonSendSync<ViewMut<'a, T>>;
+impl<T: Component> Borrow for NonSendSync<ViewMut<'_, T>> {
+    type View<'a> = NonSendSync<ViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -451,18 +355,11 @@ impl<'a, T: Component> Borrow<'a> for NonSendSync<ViewMutBorrower<T>> {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct UniqueViewBorrower<T>(T);
-
-impl<T: Send + Sync + Component> IntoBorrow for UniqueView<'_, T> {
-    type Borrow = UniqueViewBorrower<T>;
-}
-
-impl<'a, T: Send + Sync + Component> Borrow<'a> for UniqueViewBorrower<T> {
-    type View = UniqueView<'a, T>;
+impl<T: Send + Sync + Component> Borrow for UniqueView<'_, T> {
+    type View<'a> = UniqueView<'a, T>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -486,16 +383,11 @@ impl<'a, T: Send + Sync + Component> Borrow<'a> for UniqueViewBorrower<T> {
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Sync + Component> IntoBorrow for NonSend<UniqueView<'_, T>> {
-    type Borrow = NonSend<UniqueViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Sync + Component> Borrow<'a> for NonSend<UniqueViewBorrower<T>> {
-    type View = NonSend<UniqueView<'a, T>>;
+impl<T: Sync + Component> Borrow for NonSend<UniqueView<'_, T>> {
+    type View<'a> = NonSend<UniqueView<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -519,16 +411,11 @@ impl<'a, T: Sync + Component> Borrow<'a> for NonSend<UniqueViewBorrower<T>> {
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Send + Component> IntoBorrow for NonSync<UniqueView<'_, T>> {
-    type Borrow = NonSync<UniqueViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Send + Component> Borrow<'a> for NonSync<UniqueViewBorrower<T>> {
-    type View = NonSync<UniqueView<'a, T>>;
+impl<T: Send + Component> Borrow for NonSync<UniqueView<'_, T>> {
+    type View<'a> = NonSync<UniqueView<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -552,16 +439,11 @@ impl<'a, T: Send + Component> Borrow<'a> for NonSync<UniqueViewBorrower<T>> {
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Component> IntoBorrow for NonSendSync<UniqueView<'_, T>> {
-    type Borrow = NonSendSync<UniqueViewBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Component> Borrow<'a> for NonSendSync<UniqueViewBorrower<T>> {
-    type View = NonSendSync<UniqueView<'a, T>>;
+impl<T: Component> Borrow for NonSendSync<UniqueView<'_, T>> {
+    type View<'a> = NonSendSync<UniqueView<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -584,18 +466,11 @@ impl<'a, T: Component> Borrow<'a> for NonSendSync<UniqueViewBorrower<T>> {
     }
 }
 
-/// Helper struct allowing GAT-like behavior in stable.
-pub struct UniqueViewMutBorrower<T>(T);
-
-impl<T: Send + Sync + Component> IntoBorrow for UniqueViewMut<'_, T> {
-    type Borrow = UniqueViewMutBorrower<T>;
-}
-
-impl<'a, T: Send + Sync + Component> Borrow<'a> for UniqueViewMutBorrower<T> {
-    type View = UniqueViewMut<'a, T>;
+impl<T: Send + Sync + Component> Borrow for UniqueViewMut<'_, T> {
+    type View<'a> = UniqueViewMut<'a, T>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -619,16 +494,11 @@ impl<'a, T: Send + Sync + Component> Borrow<'a> for UniqueViewMutBorrower<T> {
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Sync + Component> IntoBorrow for NonSend<UniqueViewMut<'_, T>> {
-    type Borrow = NonSend<UniqueViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Sync + Component> Borrow<'a> for NonSend<UniqueViewMutBorrower<T>> {
-    type View = NonSend<UniqueViewMut<'a, T>>;
+impl<T: Sync + Component> Borrow for NonSend<UniqueViewMut<'_, T>> {
+    type View<'a> = NonSend<UniqueViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -650,18 +520,12 @@ impl<'a, T: Sync + Component> Borrow<'a> for NonSend<UniqueViewMutBorrower<T>> {
         }))
     }
 }
-
 #[cfg(feature = "thread_local")]
-impl<T: Send + Component> IntoBorrow for NonSync<UniqueViewMut<'_, T>> {
-    type Borrow = NonSync<UniqueViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Send + Component> Borrow<'a> for NonSync<UniqueViewMutBorrower<T>> {
-    type View = NonSync<UniqueViewMut<'a, T>>;
+impl<T: Send + Component> Borrow for NonSync<UniqueViewMut<'_, T>> {
+    type View<'a> = NonSync<UniqueViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -685,16 +549,11 @@ impl<'a, T: Send + Component> Borrow<'a> for NonSync<UniqueViewMutBorrower<T>> {
 }
 
 #[cfg(feature = "thread_local")]
-impl<T: Component> IntoBorrow for NonSendSync<UniqueViewMut<'_, T>> {
-    type Borrow = NonSendSync<UniqueViewMutBorrower<T>>;
-}
-
-#[cfg(feature = "thread_local")]
-impl<'a, T: Component> Borrow<'a> for NonSendSync<UniqueViewMutBorrower<T>> {
-    type View = NonSendSync<UniqueViewMut<'a, T>>;
+impl<T: Component> Borrow for NonSendSync<UniqueViewMut<'_, T>> {
+    type View<'a> = NonSendSync<UniqueViewMut<'a, T>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         let (all_storages, all_borrow) = unsafe {
             Ref::destructure(
                 world
@@ -717,30 +576,22 @@ impl<'a, T: Component> Borrow<'a> for NonSendSync<UniqueViewMutBorrower<T>> {
     }
 }
 
-impl<T: IntoBorrow> IntoBorrow for Option<T> {
-    type Borrow = Option<T::Borrow>;
-}
-
-impl<'a, T: Borrow<'a>> Borrow<'a> for Option<T> {
-    type View = Option<T::View>;
+impl<T: Borrow> Borrow for Option<T> {
+    type View<'a> = Option<T::View<'a>>;
 
     #[inline]
-    fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+    fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
         Ok(T::borrow(world).ok())
     }
 }
 
 macro_rules! impl_world_borrow {
     ($(($type: ident, $index: tt))+) => {
-        impl<$($type: IntoBorrow),+> IntoBorrow for ($($type,)+) {
-            type Borrow = ($($type::Borrow,)+);
-        }
-
-        impl<'a, $($type: Borrow<'a>),+> Borrow<'a> for ($($type,)+) {
-            type View = ($($type::View,)+);
+        impl<$($type: Borrow),+> Borrow for ($($type,)+) {
+            type View<'a> = ($($type::View<'a>,)+);
 
             #[inline]
-            fn borrow(world: &'a World) -> Result<Self::View, error::GetStorage> {
+            fn borrow(world: &World) -> Result<Self::View<'_>, error::GetStorage> {
                 Ok(($($type::borrow(world)?,)+))
             }
         }

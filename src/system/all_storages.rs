@@ -1,6 +1,6 @@
 use super::Nothing;
 use crate::all_storages::AllStorages;
-use crate::borrow::{AllStoragesBorrow, Borrow, IntoBorrow};
+use crate::borrow::{AllStoragesBorrow, Borrow};
 use crate::error;
 
 /// Trait bound encompassing all functions that can be used as system.  
@@ -36,12 +36,12 @@ where
 
 macro_rules! impl_all_system {
     ($(($type: ident, $index: tt))+) => {
-        impl<'s, $($type: IntoBorrow,)+ Return, Func> AllSystem<'s, (), ($($type,)+), Return> for Func
+        impl<'s, $($type: Borrow,)+ Return, Func> AllSystem<'s, (), ($($type,)+), Return> for Func
         where
             Func: FnOnce($($type),+) -> Return
-                + FnOnce($(<$type::Borrow as Borrow<'s>>::View),+) -> Return,
+                + FnOnce($($type::View<'s>),+) -> Return,
             $(
-                $type::Borrow: AllStoragesBorrow<'s>,
+                $type: AllStoragesBorrow,
             )+
         {
             fn run(
@@ -49,16 +49,16 @@ macro_rules! impl_all_system {
                 _: (),
                 all_storages: &'s AllStorages,
             ) -> Result<Return, error::GetStorage> {
-                    Ok(self($($type::Borrow::all_borrow(all_storages)?,)+))
+                    Ok(self($($type::all_borrow(all_storages)?,)+))
             }
         }
 
-        impl<'s, Data, $($type: IntoBorrow,)+ Return, Func> AllSystem<'s, (Data,), ($($type,)+), Return> for Func
+        impl<'s, Data, $($type: Borrow,)+ Return, Func> AllSystem<'s, (Data,), ($($type,)+), Return> for Func
         where
             Func: FnOnce(Data, $($type),+) -> Return
-                + FnOnce(Data, $(<$type::Borrow as Borrow<'s>>::View),+) -> Return,
+                + FnOnce(Data, $($type::View<'s>),+) -> Return,
             $(
-                $type::Borrow: AllStoragesBorrow<'s>,
+                $type: AllStoragesBorrow,
             )+
         {
             fn run(
@@ -66,7 +66,7 @@ macro_rules! impl_all_system {
                 (data,): (Data,),
                 all_storages: &'s AllStorages,
             ) -> Result<Return, error::GetStorage> {
-                    Ok(self(data, $($type::Borrow::all_borrow(all_storages)?,)+))
+                    Ok(self(data, $($type::all_borrow(all_storages)?,)+))
             }
         }
     }

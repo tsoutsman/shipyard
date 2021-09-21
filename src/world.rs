@@ -667,7 +667,13 @@ let i = world.run(sys1).unwrap();
 
         let batches = scheduler.workload(name.as_ref())?;
 
-        self.run_batches(&scheduler.systems, &scheduler.system_names, batches)
+        self.run_batches(
+            &scheduler.systems,
+            &scheduler.system_names,
+            batches,
+            #[cfg(feature = "tracing")]
+            name.as_ref(),
+        )
     }
     #[allow(clippy::type_complexity)]
     pub(crate) fn run_batches(
@@ -675,20 +681,53 @@ let i = world.run(sys1).unwrap();
         systems: &[Box<dyn Fn(&World) -> Result<(), error::Run> + Send + Sync + 'static>],
         system_names: &[&'static str],
         batches: &Batches,
+        #[cfg(feature = "tracing")] workload_name: &str,
     ) -> Result<(), error::RunWorkload> {
         #[cfg(feature = "parallel")]
         {
+            #[cfg(feature = "tracing")]
+            let parent_span = tracing::info_span!("run_workload", %workload_name);
+
             for batch in &batches.parallel {
                 if batch.len() == 1 {
-                    systems[batch[0]](self)
-                        .map_err(|err| error::RunWorkload::Run((system_names[batch[0]], err)))?;
+                    let system_name = system_names[batch[0]];
+
+                    #[cfg(feature = "tracing")]
+                    {
+                        systems[batch[0]](self).map_err(|err| {
+                            tracing::info_span!(parent: parent_span.clone(), "run_system", %system_name)
+                                .in_scope(|| error::RunWorkload::Run((system_name, err)))
+                        })?;
+                    }
+
+                    #[cfg(not(feature = "tracing"))]
+                    {
+                        systems[batch[0]](self)
+                            .map_err(|err| error::RunWorkload::Run((system_name, err)))?;
+                    }
                 } else {
                     use rayon::prelude::*;
 
-                    batch.into_par_iter().try_for_each(|&index| {
-                        (systems[index])(self)
-                            .map_err(|err| error::RunWorkload::Run((system_names[index], err)))
-                    })?;
+                    #[cfg(feature = "tracing")]
+                    {
+                        batch.into_par_iter().try_for_each(|&index| {
+                            let system_name = system_names[index];
+
+                            tracing::info_span!(parent: parent_span.clone(), "run_system", %system_name)
+                                .in_scope(|| {
+                                    (systems[index])(self)
+                                        .map_err(|err| error::RunWorkload::Run((system_name, err)))
+                                })
+                        })?;
+                    }
+
+                    #[cfg(not(feature = "tracing"))]
+                    {
+                        batch.into_par_iter().try_for_each(|&index| {
+                            (systems[index])(self)
+                                .map_err(|err| error::RunWorkload::Run((system_names[index], err)))
+                        })?;
+                    }
                 }
             }
 
@@ -725,6 +764,8 @@ let i = world.run(sys1).unwrap();
                 &scheduler.systems,
                 &scheduler.system_names,
                 scheduler.default_workload(),
+                #[cfg(feature = "tracing")]
+                &scheduler.default,
             )?
         }
         Ok(())
